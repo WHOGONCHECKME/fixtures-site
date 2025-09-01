@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Home Fixtures Selector</title>
+  <style>
+    :root { --accent: #0ea5e9; --bg: #0b1220; --panel:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --chip:#1e293b; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; color: var(--text); background: linear-gradient(180deg,#0b1220, #0b1220 120px, #0b1220); }
+    header { position: sticky; top:0; z-index:10; background: rgba(11,18,32,0.8); backdrop-filter: blur(6px); border-bottom: 1px solid #1f2937; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+    .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr auto auto; gap: 8px; margin-top: 12px; }
+    .toolbar input, .toolbar select, .toolbar button { height: 36px; border-radius: 10px; border: 1px solid #243244; background: #0f172a; color: var(--text); padding: 0 10px; }
+    .toolbar button { background: var(--accent); border: none; color: #001018; font-weight: 700; cursor: pointer; }
+    .toolbar .ghost { background: #0f172a; color: var(--text); border:1px solid #334155; }
+
+    main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; padding: 16px; }
+    .panel { background: var(--panel); border: 1px solid #1f2a3a; border-radius: 14px; padding: 14px; box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .card { position: relative; background: #0b1324; border: 1px solid #1d293b; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+    .card img { width: 100%; height: 150px; object-fit: cover; background: #0a1020; }
+    .card .info { padding: 10px; display: grid; gap: 6px; }
+    .title { font-size: 14px; font-weight: 700; }
+    .meta { color: var(--muted); font-size: 12px; }
+    .sku { font-size: 11px; color: #9ca3af; }
+    .price { font-size: 13px; font-weight: 700; color: #a7f3d0; }
+    .pick { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.55); padding: 4px 6px; border-radius: 8px; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .pick input { width: 16px; height: 16px; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 11px; background: var(--chip); border: 1px solid #243244; padding: 4px 8px; border-radius: 999px; }
+
+    .cart { position: sticky; top: 84px; display: grid; gap: 10px; }
+    .cart h3 { margin: 0 0 4px 0; font-size: 16px; }
+    .line { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; border: 1px solid #1f2a3a; background: #0b1324; }
+    .line .small { font-size: 12px; color: var(--muted); }
+    .del { background: transparent; border: none; color: #fca5a5; cursor: pointer; font-size: 18px; line-height: 1; }
+
+    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 16px; }
+    .hint { font-size: 12px; color: var(--muted); }
+
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .cart { position: relative; top: 0; }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Home Fixtures Selector</h1>
+      <div class="sub">Click options to build a selection list. Export or share the link.</div>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search (e.g., 'tap chrome modern')" />
+        <select id="catFilter"><option value="">All categories</option></select>
+        <select id="colorFilter"><option value="">All colours</option></select>
+        <button id="exportCsv">Export CSV</button>
+        <button id="shareLink" class="ghost">Share link</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <div id="count" class="hint" style="margin-bottom:8px"></div>
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <aside class="panel cart">
+      <h3>Your Selection</h3>
+      <div id="cartList"></div>
+      <div class="hint" style="margin-top:6px">Tip: Export CSV and attach it to your order email.</div>
+    </aside>
+  </main>
+
+  <footer>
+    <div>Built for GitHub Pages – no backend required.</div>
+  </footer>
+
+  <script>
+    // ---------- 1) CATALOG DATA (edit this) ----------
+    // Add as many items as you like. Ensure the image files exist in your repo.
+    const CATALOG = [
+      { sku: "B-TAP-001", category: "Bathroom", item: "Tap", style: "Modern", color: "Chrome", finish:"Polished", price: 120, img: "images/bathroom/tap_modern_chrome.jpg" },
+      { sku: "B-TAP-002", category: "Bathroom", item: "Tap", style: "Classic", color: "Brushed Nickel", finish:"Brushed", price: 115, img: "images/bathroom/tap_classic_brushed.jpg" },
+      { sku: "K-SINK-001", category: "Kitchen", item: "Sink", style: "Undermount", color: "Stainless", finish:"Matte", price: 380, img: "images/kitchen/sink_undermount_stainless.jpg" },
+      { sku: "K-TAP-003", category: "Kitchen", item: "Mixer Tap", style: "Pull-out", color: "Black", finish:"Matte", price: 210, img: "images/kitchen/mixer_pullout_black.jpg" },
+      { sku: "L-LIGHT-001", category: "Lighting", item: "Downlight", style: "LED", color: "Warm White", finish:"-", price: 24, img: "images/lighting/downlight_led_warm.jpg" },
+      { sku: "D-HANDLE-004", category: "Doors", item: "Handle", style: "Lever", color: "Brass", finish:"Satin", price: 45, img: "images/doors/handle_lever_brass.jpg" },
+    ];
+
+    // ---------- 2) STATE ----------
+    const state = {
+      query: "",
+      category: "",
+      color: "",
+      selected: new Map(), // sku -> item
+    };
+
+    // Preselect from URL (?skus=SKU1,SKU2)
+    const urlParams = new URLSearchParams(location.search);
+    const preSkus = (urlParams.get("skus")||"").split(",").filter(Boolean);
+
+    // ---------- 3) UI HELPERS ----------
+    const $ = (sel) => document.querySelector(sel);
+    const gridEl = $("#grid");
+    const cartEl = $("#cartList");
+    const catEl = $("#catFilter");
+    const colorEl = $("#colorFilter");
+    const searchEl = $("#search");
+    const countEl = $("#count");
+
+    function unique(list, key) { return Array.from(new Set(list.map(x => x[key]).filter(Boolean))).sort(); }
+
+    function matches(item) {
+      if (state.category && item.category !== state.category) return false;
+      if (state.color && (item.color||"") !== state.color) return false;
+      if (!state.query) return true;
+      const hay = [item.category, item.item, item.style, item.color, item.finish, item.sku].join(" ").toLowerCase();
+      return state.query.split(/\s+/).every(tok => hay.includes(tok));
+    }
+
+    function renderFilters() {
+      // Categories
+      for (const c of unique(CATALOG, 'category')) {
+        const o = document.createElement('option'); o.value=c; o.textContent=c; catEl.appendChild(o);
+      }
+      // Colours
+      for (const c of unique(CATALOG, 'color')) {
+        const o = document.createElement('option'); o.value=c; o.textContent=c; colorEl.appendChild(o);
+      }
+    }
+
+    function card(item) {
+      const checked = state.selected.has(item.sku);
+      return `
+        <div class="card" data-sku="${item.sku}">
+          <img src="${item.img}" alt="${item.item} – ${item.style} – ${item.color}" onerror="this.src='data:image/svg+xml;utf8,${encodeURIComponent(placeholderSVG(item))}'" />
+          <label class="pick"><input type="checkbox" ${checked?"checked":""}/> Pick</label>
+          <div class="info">
+            <div class="title">${item.item} <span class="meta">· ${item.style}</span></div>
+            <div class="chips">
+              <span class="chip">${item.category}</span>
+              <span class="chip">${item.color}</span>
+              ${item.finish?`<span class="chip">${item.finish}</span>`:""}
+            </div>
+            <div class="sku">SKU: ${item.sku}</div>
+            <div class="price">$${Number(item.price).toLocaleString(undefined,{minimumFractionDigits:0})}</div>
+          </div>
+        </div>`;
+    }
+
+    function placeholderSVG(item){
+      const t = `${item.item}\\n${item.style}\\n${item.color}`;
+      return `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400'>
+        <rect width='100%' height='100%' fill='%230b1020' />
+        <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' font-size='20'>${t}</text>
+      </svg>`;
+    }
+
+    function renderGrid() {
+      const items = CATALOG.filter(matches);
+      countEl.textContent = `${items.length} item(s)`;
+      gridEl.innerHTML = items.map(card).join("");
+    }
+
+    function renderCart() {
+      const rows = Array.from(state.selected.values()).map(it => `
+        <div class="line" data-sku="${it.sku}">
+          <div>
+            <div>${it.item} – ${it.style} <span class="small">(${it.color}, ${it.category})</span></div>
+            <div class="small">SKU: ${it.sku}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px">
+            <div class="small">$${Number(it.price).toLocaleString()}</div>
+            <button class="del" title="Remove">×</button>
+          </div>
+        </div>`).join("");
+      cartEl.innerHTML = rows || '<div class="hint">Nothing selected yet.</div>';
+    }
+
+    function toggleSelection(sku) {
+      const item = CATALOG.find(x=>x.sku===sku);
+      if (!item) return;
+      if (state.selected.has(sku)) state.selected.delete(sku); else state.selected.set(sku,item);
+      renderGrid(); renderCart(); updateURL();
+    }
+
+    function updateURL(){
+      const skus = Array.from(state.selected.keys()).join(',');
+      const url = new URL(location.href); url.searchParams.set('skus', skus); history.replaceState(null,'',url);
+    }
+
+    function exportCSV(){
+      const cols = ["sku","category","item","style","color","finish","price","img"];
+      const lines = [cols.join(",")];
+      for (const it of state.selected.values()) {
+        const row = cols.map(k => (`${it[k]??""}`).replaceAll('"','""'));
+        lines.push(row.map(x=>/[,\"\n]/.test(x)?`"${x}"`:x).join(","));
+      }
+      const blob = new Blob([lines.join("\n")],{type:'text/csv;charset=utf-8'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `fixtures_selection_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    function shareLink(){
+      const url = new URL(location.href);
+      navigator.clipboard.writeText(url.href).then(()=>{
+        alert('Link copied to clipboard');
+      },()=>{
+        prompt('Copy this link:', url.href);
+      });
+    }
+
+    // ---------- 4) EVENT WIRING ----------
+    document.addEventListener('click', (e)=>{
+      const card = e.target.closest('.card');
+      if (card && (e.target.matches('input[type=checkbox]') || e.target.closest('.pick'))) {
+        toggleSelection(card.dataset.sku);
+      }
+      const del = e.target.closest('.del');
+      if (del) {
+        const sku = e.target.closest('.line').dataset.sku; state.selected.delete(sku); renderGrid(); renderCart(); updateURL();
+      }
+    });
+    searchEl.addEventListener('input', () => { state.query = searchEl.value.trim().toLowerCase(); renderGrid(); });
+    catEl.addEventListener('change', () => { state.category = catEl.value; renderGrid(); });
+    colorEl.addEventListener('change', () => { state.color = colorEl.value; renderGrid(); });
+    $('#exportCsv').addEventListener('click', exportCSV);
+    $('#shareLink').addEventListener('click', shareLink);
+
+    // ---------- 5) INIT ----------
+    renderFilters();
+    // Apply preselected SKUs from URL
+    for (const sku of preSkus) {
+      const it = CATALOG.find(x=>x.sku===sku);
+      if (it) state.selected.set(sku,it);
+    }
+    renderGrid();
+    renderCart();
+  </script>
+</body>
+</html>
