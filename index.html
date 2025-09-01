@@ -18,7 +18,7 @@
     .toolbar button { background: var(--accent); border: none; color: #001018; font-weight: 700; cursor: pointer; }
     .toolbar .ghost { background: #0f172a; color: var(--text); border:1px solid #334155; }
 
-    main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; padding: 16px; }
+    main { display: grid; grid-template-columns: 260px 1fr 320px; gap: 16px; align-items: start; padding: 16px; }
     .panel { background: var(--panel); border: 1px solid #1f2a3a; border-radius: 14px; padding: 14px; box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset; }
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
@@ -46,6 +46,7 @@
 
     @media (max-width: 980px) {
       main { grid-template-columns: 1fr; }
+      main { grid-template-columns: 1fr; }
       .cart { position: relative; top: 0; }
       .toolbar { grid-template-columns: 1fr 1fr; }
     }
@@ -67,6 +68,19 @@
   </header>
 
   <main class="wrap">
+    <aside class="panel" id="requirementsPanel">
+      <h3 style="margin:0 0 8px 0; font-size:16px;">Project Requirements (optional)</h3>
+      <div class="hint" style="margin-bottom:8px">Enter desired counts; the summary will flag shortages/excesses.</div>
+      <form id="reqForm" style="display:grid; gap:8px">
+        <label>no. of bathrooms <input type="number" id="req_bathrooms" min="0" value="0" style="width:100%; height:32px; border-radius:8px; border:1px solid #243244; background:#0f172a; color:var(--text); padding:0 8px"></label>
+        <label>no. of toilets <input type="number" id="req_toilets" min="0" value="0" style="width:100%; height:32px; border-radius:8px; border:1px solid #243244; background:#0f172a; color:var(--text); padding:0 8px"></label>
+        <label>no. of basins <input type="number" id="req_basins" min="0" value="0" style="width:100%; height:32px; border-radius:8px; border:1px solid #243244; background:#0f172a; color:var(--text); padding:0 8px"></label>
+        <label>no. of basin wastes <input type="number" id="req_basin_wastes" min="0" value="0" style="width:100%; height:32px; border-radius:8px; border:1px solid #243244; background:#0f172a; color:var(--text); padding:0 8px"></label>
+        <label>no. of bathtubs <input type="number" id="req_bathtubs" min="0" value="0" style="width:100%; height:32px; border-radius:8px; border:1px solid #243244; background:#0f172a; color:var(--text); padding:0 8px"></label>
+        <label>no. of showers <input type="number" id="req_showers" min="0" value="0" style="width:100%; height:32px; border-radius:8px; border:1px solid #243244; background:#0f172a; color:var(--text); padding:0 8px"></label>
+        <label>no. of mirrors <input type="number" id="req_mirrors" min="0" value="0" style="width:100%; height:32px; border-radius:8px; border:1px solid #243244; background:#0f172a; color:var(--text); padding:0 8px"></label>
+      </form>
+    </aside>
     <section class="panel">
       <div id="count" class="hint" style="margin-bottom:8px"></div>
       <div id="grid" class="grid"></div>
@@ -76,6 +90,9 @@
       <h3>Your Selection</h3>
       <div id="cartList"></div>
       <div class="hint" style="margin-top:6px">Tip: Export CSV and attach it to your order email.</div>
+      <div id="reqResults" class="panel" style="background:#0b1324; border-radius:10px; border:1px solid #1f2a3a; padding:10px;">
+        <div class="hint">Requirements check appears here when you add targets.</div>
+      </div>
     </aside>
   </main>
 
@@ -102,6 +119,19 @@
       color: "",
       selected: new Map(), // sku -> item
     };
+
+    // Map requirement fields to catalog item names for comparison
+    const REQUIREMENT_MAP = [
+      { id: 'bathrooms', label: 'Bathrooms', itemName: null }, // informational only
+      { id: 'toilets', label: 'Toilets', itemName: 'Toilet' },
+      { id: 'basins', label: 'Basins', itemName: 'Basin' },
+      { id: 'basin_wastes', label: 'Basin wastes', itemName: 'Basin Waste' },
+      { id: 'bathtubs', label: 'Bathtubs', itemName: 'Bathtub' },
+      { id: 'showers', label: 'Showers', itemName: 'Shower' },
+      { id: 'mirrors', label: 'Mirrors', itemName: 'Mirror' },
+    ];
+
+    state.requirements = REQUIREMENT_MAP.reduce((acc, r) => (acc[r.id] = 0, acc), {});
 
     // Preselect from URL (?skus=SKU1,SKU2)
     const urlParams = new URLSearchParams(location.search);
@@ -183,6 +213,38 @@
           </div>
         </div>`).join("");
       cartEl.innerHTML = rows || '<div class="hint">Nothing selected yet.</div>';
+      renderReqResults();
+    }
+
+    function readRequirementsFromForm(){
+      for (const r of REQUIREMENT_MAP) {
+        const el = document.getElementById('req_'+r.id);
+        if (el) state.requirements[r.id] = Math.max(0, parseInt(el.value||'0',10));
+      }
+    }
+
+    function countSelectedByItemName(name){
+      let n = 0; for (const it of state.selected.values()) if ((it.item||'').toLowerCase() === (name||'').toLowerCase()) n++; return n;
+    }
+
+    function renderReqResults(){
+      const box = document.getElementById('reqResults');
+      if (!box) return;
+      const rows = [];
+      for (const r of REQUIREMENT_MAP) {
+        const target = state.requirements[r.id] || 0;
+        if (!r.itemName) continue; // informational only
+        if (target === 0) continue; // skip unset
+        const have = countSelectedByItemName(r.itemName);
+        const diff = have - target;
+        const status = diff === 0 ? '✓ exact' : (diff < 0 ? `Need ${Math.abs(diff)} more` : `Too many by ${diff}`);
+        const color = diff === 0 ? '#a7f3d0' : (diff < 0 ? '#fbbf24' : '#fca5a5');
+        rows.push(`<div class="line" style="grid-template-columns: 1fr auto;">
+            <div>${r.label} <span class="small">target ${target}, selected ${have}</span></div>
+            <div class="small" style="color:${color}">${status}</div>
+          </div>`);
+      }
+      box.innerHTML = rows.length ? (`<h3 style="margin:0 0 6px 0; font-size:14px;">Requirements Check</h3>` + rows.join('')) : '<div class="hint">Set any counts on the left to see checks here.</div>';
     }
 
     function toggleSelection(sku) {
@@ -237,6 +299,12 @@
     $('#exportCsv').addEventListener('click', exportCSV);
     $('#shareLink').addEventListener('click', shareLink);
 
+    // Requirements form listeners
+    document.getElementById('reqForm').addEventListener('input', () => {
+      readRequirementsFromForm();
+      renderReqResults();
+    });
+
     // ---------- 5) INIT ----------
     renderFilters();
     // Apply preselected SKUs from URL
@@ -246,6 +314,8 @@
     }
     renderGrid();
     renderCart();
+    readRequirementsFromForm();
+    renderReqResults();
   </script>
 </body>
 </html>
